@@ -1,0 +1,72 @@
+---
+  - hosts: all
+    remote_user: ubuntu
+    become: yes
+    gather_facts: yes
+
+    vars:
+        NODEJS_VERSION: 12
+        appDir: /home/ubuntu/chatApp
+
+    tasks:
+      - name: Ensure dependencies are present.
+        apt:
+          name: [apt-transport-https, gnupg2]
+          state: present
+          update_cache: yes
+
+      - name: Add the gpg key for nodejs LTS.
+        apt_key: url="https://deb.nodesource.com/gpgkey/nodesource.gpg.key" state=present
+
+      - name: Add the nodejs LTS repos.
+        apt_repository:
+          repo: "deb https://deb.nodesource.com/node_{{ NODEJS_VERSION }}.x {{ ansible_distribution_release }} main"
+          state: present
+          update_cache: yes
+
+      - name: Install nodejs and npm.
+        apt:
+          name: nodejs
+          state: present
+
+      - name: install pm2
+        command: npm install -g pm2
+
+      - name: Create app directory.
+        file:
+          path: "{{ appDir }}"
+          state: directory
+
+      - name: Syncing Application
+        synchronize:
+          src: ../Chat-app-nodejs-terraform-ansible/
+          dest: "{{ appDir }}"
+          delete: yes
+          recursive: yes
+          mode: push
+          rsync_opts:
+            - "--exclude=.git*"
+            - "--exclude=terraform/"
+            - "--exclude=ansible-playbook/"
+        delegate_to: localhost
+        register: sync_finished
+
+
+      - name: Running NPM installs.
+        command: npm install
+        args:
+          chdir: "{{ appDir }}"
+        when: sync_finished.changed
+        register: npm_finished
+
+      - name: Stop APP.
+        command: pm2 stop app.js
+        args:
+          chdir: "{{ appDir }}"
+        ignore_errors: yes
+
+      - name: Start APP.
+        command: pm2 start app.js
+        args:
+          chdir: "{{ appDir }}"
+        when: npm_finished.changed
