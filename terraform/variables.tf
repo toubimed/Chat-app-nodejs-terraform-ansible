@@ -58,9 +58,6 @@ variable "ALB_NAME" {
 variable "ALB_TARGET_GROUP" {
   default = "alb-target-group"
 }
-variable "LISTENER_NAME" {
-  default = "frontend-listener"
-}
 variable "INSTANCE1_NAME" {
   default = "app-2"
 }
